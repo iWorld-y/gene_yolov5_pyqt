@@ -5,9 +5,9 @@ import sys
 import cv2
 import numpy as np
 import onnxruntime
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
-from torch.backends import cudnn
 
 from MainWindow import *
 
@@ -25,8 +25,66 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         self.init_clicked()
 
     def init_clicked(self):
+        # 打开权重
         self.main_ui.open_weight.clicked.connect(self.open_weight)
+        # 检测图片
         self.main_ui.detect_image.clicked.connect(self.detect_image)
+
+        # 暂停摄像头画面
+        self.main_ui.pause_video.clicked.connect(self.toggle_pause)
+
+        # 初始化摄像头
+        self.video_capture = cv2.VideoCapture(0)
+        self.main_ui.detect_camer.clicked.connect(self.open_camer)
+
+        # 标识当前是否处于暂停状态
+        self.paused_camer = False
+        # 退出
+        self.main_ui.quit_button.clicked.connect(QApplication.quit)
+
+    def toggle_pause(self):
+        # 处理暂停信号
+        self.paused_camer = not self.paused_camer
+        self.main_ui.pause_video.setText(
+            QtCore.QCoreApplication.translate("MainWindow", "暂停" if self.paused_camer else "继续"))
+
+    def open_video(self):
+        pass
+
+    def open_camer(self):
+        # 创建定时器，用于更新画面
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.open_camer)
+        self.timer.start(50)
+        # 如果处于暂停状态，直接返回
+        if self.paused_camer:
+            return
+        # 读取摄像头画面并将其翻转
+        _, video_stream = self.video_capture.read()
+        video_stream = cv2.flip(video_stream, 1)
+        # 矫正颜色
+        video_stream = cv2.cvtColor(video_stream, cv2.COLOR_BGR2RGB)
+        height, width, channel = video_stream.shape
+        # video_stream = self.inference('', video_stream)
+        # 创建 QImage 对象，并从摄像头画面中获取像素数据
+        qimage = QImage(video_stream, width, height, channel * width, QImage.Format_RGB888)
+        pixmap = QtGui.QPixmap(qimage).scaled(self.main_ui.origin_image.width(),
+                                              self.main_ui.origin_image.height())
+        self.main_ui.origin_image.setPixmap(pixmap)
+
+        # 预测画面
+        try:
+            output_stream, origin_stream = self.inference('', video_stream)
+            outbox_stream = self.filter_box(output_stream, 0.5, 0.5)
+            self.draw(origin_stream, outbox_stream)
+        except IndexError as e:
+            logging.warning("未发现衣物")
+            origin_stream = video_stream
+        origin_stream = QImage(origin_stream[:], origin_stream.shape[1], origin_stream.shape[0],
+                               origin_stream.shape[1] * 3, QImage.Format_RGB888)
+        pixmap_stream = QtGui.QPixmap.fromImage(origin_stream).scaled(self.main_ui.show_label.width(),
+                                                                      self.main_ui.show_label.height())
+        self.main_ui.show_label.setPixmap(pixmap_stream)
 
     def open_weight(self):
         self.weight_path, _ = QFileDialog.getOpenFileName(self.main_ui.open_weight, "选择权重",
@@ -71,7 +129,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
 
         logging.info(f"已打开图片：{self.imgName}")
         logging.info(f"开始推理")
-        output_img, origin_img = self.inference(self.imgName)
+        output_img, origin_img = self.inference(self.imgName, np.ndarray([0]))
         outbox_img = self.filter_box(output_img, 0.5, 0.5)
         self.draw(origin_img, outbox_img)
         cv2.imwrite('/home/eugene/code/gene_yolov5_pyqt/pyqt/temp/res_1.jpg', origin_img)
@@ -83,8 +141,9 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
                                                                    self.main_ui.show_label.height())
         self.main_ui.show_label.setPixmap(pixmap_imgSrc)
 
-    def inference(self, img_path):
-        img = cv2.imread(img_path)
+    def inference(self, img_path: str, img: np.ndarray):
+        if (img_path):
+            img = cv2.imread(img_path)
         img_o = img.copy()
         or_img = cv2.resize(img, (640, 640))
         img = or_img[:, :, ::-1].transpose(2, 0, 1)  # BGR2RGB和HWC2CHW
@@ -146,7 +205,8 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         y[:, 3] = x[:, 1] + x[:, 3] / 2
         return y
 
-    def filter_box(self, org_box, conf_thres, iou_thres):  # 过滤掉无用的框
+    def filter_box(self, org_box, conf_thres, iou_thres):
+        # 过滤掉无用的框
         # -------------------------------------------------------
         #   删除为1的维度
         #   删除置信度小于conf_thres的BOX
@@ -170,7 +230,6 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         #   4.利用下标取出非极大抑制后的BOX
         # -------------------------------------------------------
         output = []
-
         for i in range(len(all_cls)):
             curr_cls = all_cls[i]
             curr_cls_box = []
@@ -203,7 +262,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
 
         for box, score, cl in zip(boxes, scores, classes):
             top, left, right, bottom = box
-            self.main_ui.detect_result_text.append(f"检测到：[{self.CLASSES[cl]}]，分数为：{score}")
+            self.main_ui.detect_result_text.append(f"检测到：[{self.CLASSES[cl]}]，分数为：{score:.2f}")
             self.main_ui.detect_result_text.append(f"检测框坐标：{top}, {left}, {right}, {bottom}\n")
             logging.info('class: {}, score: {}'.format(self.CLASSES[cl], score))
             logging.info('box coordinate left,top,right,down: [{}, {}, {}, {}]'.format(top, left, right, bottom))

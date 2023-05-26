@@ -190,7 +190,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton_video">
+            <widget class="QPushButton" name="detect_video">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
                <horstretch>0</horstretch>
@@ -209,7 +209,7 @@
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="pushButton_camer">
+            <widget class="QPushButton" name="detect_camer">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
                <horstretch>0</horstretch>
@@ -265,14 +265,14 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
-          <widget class="QPushButton" name="pushButton_stop">
+          <widget class="QPushButton" name="pause_video">
            <property name="text">
             <string>暂停/继续</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_finish">
+          <widget class="QPushButton" name="quit_button">
            <property name="text">
             <string>结束检测</string>
            </property>
