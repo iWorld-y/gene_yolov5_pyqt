@@ -22,7 +22,35 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
 
         self.main_ui = Ui_MainWindow()
         self.main_ui.setupUi(self)
+        self.iou = 0.5
+        self.conf = 0.5
         self.init_clicked()
+        self.init_slider()
+
+    def init_slider(self):
+        # IoU
+        self.main_ui.IoU_label.setText(f"IoU:\t{self.iou:.2f}")
+        self.main_ui.IoU_Slider.setMinimum(0)
+        self.main_ui.IoU_Slider.setMaximum(100)
+        self.main_ui.IoU_Slider.setValue(int(self.iou * 100))
+        self.main_ui.IoU_Slider.valueChanged[int].connect(self.set_iou)
+
+        # Conf
+        self.main_ui.Conf_label.setText(f"Conf:\t{self.conf:.2f}")
+        self.main_ui.Conf_Slider.setMinimum(0)
+        self.main_ui.Conf_Slider.setMaximum(100)
+        self.main_ui.Conf_Slider.setValue(int(self.conf * 100))
+        self.main_ui.Conf_Slider.valueChanged[int].connect(self.set_conf)
+
+    def set_iou(self, value):
+        self.main_ui.IoU_label.setText(f"IoU:\t{self.iou:.2f}")
+        self.iou = value / 100
+        logging.info(f"iou:{self.iou}")
+
+    def set_conf(self, value):
+        self.main_ui.Conf_label.setText(f"Conf:\t{self.conf:.2f}")
+        self.conf = value / 100
+        logging.info(f"Conf:{self.conf}")
 
     def init_clicked(self):
         # 打开权重
@@ -91,7 +119,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         # 预测画面
         try:
             output_stream, origin_stream = self.inference('', self.video_stream)
-            outbox_stream = self.filter_box(output_stream, 0.5, 0.5)
+            outbox_stream = self.filter_box(output_stream, self.conf, self.iou)
             self.draw(origin_stream, outbox_stream)
         except Exception as e:
             logging.warning("未发现衣物")
@@ -127,7 +155,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         # 预测画面
         try:
             output_stream, origin_stream = self.inference('', video_stream)
-            outbox_stream = self.filter_box(output_stream, 0.5, 0.5)
+            outbox_stream = self.filter_box(output_stream, self.conf, self.iou)
             self.draw(origin_stream, outbox_stream)
         except Exception as e:
             logging.warning("未发现衣物")
@@ -182,7 +210,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         logging.info(f"已打开图片：{self.imgName}")
         logging.info(f"开始推理")
         output_img, origin_img = self.inference(self.imgName, np.ndarray([0]))
-        outbox_img = self.filter_box(output_img, 0.5, 0.5)
+        outbox_img = self.filter_box(output_img, self.conf, self.iou)
         self.draw(origin_img, outbox_img)
         cv2.imwrite('/home/eugene/code/gene_yolov5_pyqt/pyqt/temp/res_1.jpg', origin_img)
         logging.info(f"推理完成")
