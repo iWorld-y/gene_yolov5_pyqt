@@ -269,16 +269,16 @@
            <item>
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <item>
-              <widget class="QPushButton" name="quit_button">
+              <widget class="QPushButton" name="pause_video">
                <property name="text">
-                <string>结束检测</string>
+                <string>暂停/继续</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="pause_video">
+              <widget class="QPushButton" name="quit_button">
                <property name="text">
-                <string>暂停/继续</string>
+                <string>结束检测</string>
                </property>
               </widget>
              </item>

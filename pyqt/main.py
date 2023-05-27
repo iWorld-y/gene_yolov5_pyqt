@@ -30,14 +30,14 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
     def init_slider(self):
         # IoU
         self.main_ui.IoU_label.setText(f"IoU:\t{self.iou:.2f}")
-        self.main_ui.IoU_Slider.setMinimum(0)
+        self.main_ui.IoU_Slider.setMinimum(1)
         self.main_ui.IoU_Slider.setMaximum(100)
         self.main_ui.IoU_Slider.setValue(int(self.iou * 100))
         self.main_ui.IoU_Slider.valueChanged[int].connect(self.set_iou)
 
         # Conf
         self.main_ui.Conf_label.setText(f"Conf:\t{self.conf:.2f}")
-        self.main_ui.Conf_Slider.setMinimum(0)
+        self.main_ui.Conf_Slider.setMinimum(1)
         self.main_ui.Conf_Slider.setMaximum(100)
         self.main_ui.Conf_Slider.setValue(int(self.conf * 100))
         self.main_ui.Conf_Slider.valueChanged[int].connect(self.set_conf)
@@ -168,7 +168,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
 
     def open_weight(self):
         self.weight_path, _ = QFileDialog.getOpenFileName(self.main_ui.open_weight, "选择权重",
-                                                          '/home/eugene/code/Multi-labelClothingDetection/runs/v5/exp2',
+                                                          '/home/eugene/autodl-tmp/weights',
                                                           "*.onnx")
         if not self.weight_path:
             QtWidgets.QMessageBox.warning(self, "错误", "未选择权重", buttons=QtWidgets.QMessageBox.Ok,
