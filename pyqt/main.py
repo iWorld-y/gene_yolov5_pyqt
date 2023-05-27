@@ -29,6 +29,8 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         self.main_ui.open_weight.clicked.connect(self.open_weight)
         # 检测图片
         self.main_ui.detect_image.clicked.connect(self.detect_image)
+        # 检测视频
+        self.main_ui.detect_video.clicked.connect(self.load_video)
 
         # 暂停摄像头画面
         self.main_ui.pause_video.clicked.connect(self.toggle_pause)
@@ -48,8 +50,58 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         self.main_ui.pause_video.setText(
             QtCore.QCoreApplication.translate("MainWindow", "暂停" if self.paused_camer else "继续"))
 
-    def open_video(self):
-        pass
+    def load_video(self):
+        self.video_path, _ = QFileDialog.getOpenFileName(self, "打开图片",
+                                                         "/home/eugene/autodl-tmp/test",
+                                                         "All Files(*)")
+        if not self.video_path:
+            QtWidgets.QMessageBox.warning(self, "错误", "未选择视频", buttons=QtWidgets.QMessageBox.Ok,
+                                          defaultButton=QtWidgets.QMessageBox.Ok)
+            self.main_ui.open_weight.setText(
+                QtCore.QCoreApplication.translate("MainWindow", "选择权重"))
+            return
+        self.main_ui.open_weight.setText(
+            QtCore.QCoreApplication.translate("MainWindow", f"正在检测:\n{os.path.basename(self.video_path)}"))
+
+        self.video_capture = cv2.VideoCapture(self.video_path)
+        # 创建定时器，用于更新画面
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.detect_video)
+        self.timer.start(50)
+        self.detect_video()
+
+    def detect_video(self):
+        # 如果处于暂停状态，直接返回
+        if self.paused_camer:
+            return
+        # 读取视频画面并将其翻转
+        logging.info(self.video_path)
+        _, self.video_stream = self.video_capture.read()
+        self.video_stream = cv2.flip(self.video_stream, 1)
+        # 矫正颜色
+        self.video_stream = cv2.cvtColor(self.video_stream, cv2.COLOR_BGR2RGB)
+        height, width, channel = self.video_stream.shape
+        logging.info("颜色校正")
+        # 创建 QImage 对象，将原画面显示出来
+        qimage = QImage(self.video_stream, width, height, channel * width, QImage.Format_RGB888)
+        pixmap = QtGui.QPixmap(qimage).scaled(self.main_ui.origin_image.width(),
+                                              self.main_ui.origin_image.height())
+        self.main_ui.origin_image.setPixmap(pixmap)
+        logging.info("显示原图像")
+        # 预测画面
+        try:
+            output_stream, origin_stream = self.inference('', self.video_stream)
+            outbox_stream = self.filter_box(output_stream, 0.5, 0.5)
+            self.draw(origin_stream, outbox_stream)
+        except Exception as e:
+            logging.warning("未发现衣物")
+            origin_stream = self.video_stream
+        origin_stream = QImage(origin_stream[:], origin_stream.shape[1], origin_stream.shape[0],
+                               origin_stream.shape[1] * 3, QImage.Format_RGB888)
+        pixmap_stream = QtGui.QPixmap.fromImage(origin_stream).scaled(self.main_ui.show_label.width(),
+                                                                      self.main_ui.show_label.height())
+        logging.info("显示预测图像")
+        self.main_ui.show_label.setPixmap(pixmap_stream)
 
     def open_camer(self):
         # 创建定时器，用于更新画面
@@ -77,7 +129,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
             output_stream, origin_stream = self.inference('', video_stream)
             outbox_stream = self.filter_box(output_stream, 0.5, 0.5)
             self.draw(origin_stream, outbox_stream)
-        except IndexError as e:
+        except Exception as e:
             logging.warning("未发现衣物")
             origin_stream = video_stream
         origin_stream = QImage(origin_stream[:], origin_stream.shape[1], origin_stream.shape[0],
@@ -161,10 +213,8 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         y1 = dets[:, 1]
         x2 = dets[:, 2]
         y2 = dets[:, 3]
-        # -------------------------------------------------------
         #   计算框的面积
         #   置信度从大到小排序
-        # -------------------------------------------------------
         areas = (y2 - y1 + 1) * (x2 - x1 + 1)
         scores = dets[:, 4]
         keep = []
@@ -173,11 +223,9 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         while index.size > 0:
             i = index[0]
             keep.append(i)
-            # -------------------------------------------------------
             #   计算相交面积
             #   1.相交
             #   2.不相交
-            # -------------------------------------------------------
             x11 = np.maximum(x1[i], x1[index[1:]])
             y11 = np.maximum(y1[i], y1[index[1:]])
             x22 = np.minimum(x2[i], x2[index[1:]])
@@ -187,10 +235,8 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
             h = np.maximum(0, y22 - y11 + 1)
 
             overlaps = w * h
-            # -------------------------------------------------------
             #   计算该框与其它框的IOU，去除掉重复的框，即IOU值大的框
             #   IOU小于thresh的框保留下来
-            # -------------------------------------------------------
             ious = overlaps / (areas[i] + areas[index[1:]] - overlaps)
             idx = np.where(ious <= thresh)[0]
             index = index[idx + 1]
@@ -207,39 +253,31 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
 
     def filter_box(self, org_box, conf_thres, iou_thres):
         # 过滤掉无用的框
-        # -------------------------------------------------------
         #   删除为1的维度
         #   删除置信度小于conf_thres的BOX
-        # -------------------------------------------------------
         org_box = np.squeeze(org_box)
         conf = org_box[..., 4] > conf_thres
         box = org_box[conf == True]
-        # -------------------------------------------------------
         #   通过argmax获取置信度最大的类别
-        # -------------------------------------------------------
         cls_cinf = box[..., 5:]
         cls = []
         for i in range(len(cls_cinf)):
             cls.append(int(np.argmax(cls_cinf[i])))
         all_cls = list(set(cls))
-        # -------------------------------------------------------
         #   分别对每个类别进行过滤
         #   1.将第6列元素替换为类别下标
         #   2.xywh2xyxy 坐标转换
         #   3.经过非极大抑制后输出的BOX下标
         #   4.利用下标取出非极大抑制后的BOX
-        # -------------------------------------------------------
         output = []
         for i in range(len(all_cls)):
             curr_cls = all_cls[i]
             curr_cls_box = []
-            curr_out_box = []
             for j in range(len(cls)):
                 if cls[j] == curr_cls:
                     box[j][5] = curr_cls
                     curr_cls_box.append(box[j][:6])
             curr_cls_box = np.array(curr_cls_box)
-            # curr_cls_box_old = np.copy(curr_cls_box)
             curr_cls_box = self.xywh2xyxy(curr_cls_box)
             curr_out_box = self.nms(curr_cls_box, iou_thres)
             for k in curr_out_box:
@@ -248,9 +286,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         return output
 
     def draw(self, image, box_data):
-        # -------------------------------------------------------
         #   取整，方便画框
-        # -------------------------------------------------------
         boxes = box_data[..., :4].astype(np.int32)
         scores = box_data[..., 4]
         classes = box_data[..., 5].astype(np.int32)
@@ -264,8 +300,6 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
             top, left, right, bottom = box
             self.main_ui.detect_result_text.append(f"检测到：[{self.CLASSES[cl]}]，分数为：{score:.2f}")
             self.main_ui.detect_result_text.append(f"检测框坐标：{top}, {left}, {right}, {bottom}\n")
-            logging.info('class: {}, score: {}'.format(self.CLASSES[cl], score))
-            logging.info('box coordinate left,top,right,down: [{}, {}, {}, {}]'.format(top, left, right, bottom))
 
             top = int(top * x_ratio)
             right = int(right * x_ratio)

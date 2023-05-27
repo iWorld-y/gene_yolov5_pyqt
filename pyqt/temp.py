@@ -1,63 +1,46 @@
-# encoding=gbk
+import numpy as np
+import cv2
+
 import sys
 import cv2
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QPushButton
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel
 
-
-class MainWindow(QMainWindow):
+class VideoPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
-
-        # ÉèÖÃÖ÷´°¿Ú±êÌâºÍ³ß´ç
-        self.setWindowTitle('Camera Viewer')
+        self.setWindowTitle("Video Player")
         self.setGeometry(100, 100, 640, 480)
 
-        # ´´½¨ QLabel ×é¼şÓÃÓÚÏÔÊ¾ÉãÏñÍ·»­Ãæ
+        # åˆ›å»ºæ ‡ç­¾ç”¨äºæ˜¾ç¤ºè§†é¢‘ç”»é¢
         self.label = QLabel(self)
         self.label.setGeometry(0, 0, 640, 480)
 
-        # ´´½¨ÔİÍ£°´Å¥
-        self.pause_button = QPushButton('Pause', self)
-        self.pause_button.setGeometry(280, 450, 80, 30)
-        self.pause_button.clicked.connect(self.toggle_pause)
+        # æ‰“å¼€è§†é¢‘æ–‡ä»¶
+        self.cap  = cv2.VideoCapture('/home/eugene/autodl-tmp/test/1.mp4')
 
-        # ³õÊ¼»¯ÉãÏñÍ·
-        self.cap = cv2.VideoCapture(0)
-
-        # ´´½¨¶¨Ê±Æ÷£¬ÓÃÓÚ¸üĞÂ»­Ãæ
+        # å¼€å§‹æ’­æ”¾è§†é¢‘
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update_frame)
-        self.timer.start(50)
+        self.timer.timeout.connect(self.play_video)
+        self.timer.start(30)
 
-        # ±êÊ¶µ±Ç°ÊÇ·ñ´¦ÓÚÔİÍ£×´Ì¬
-        self.paused = False
-
-    def update_frame(self):
-        # Èç¹û´¦ÓÚÔİÍ£×´Ì¬£¬Ö±½Ó·µ»Ø
-        if self.paused:
-            return
-
-        # ¶ÁÈ¡ÉãÏñÍ·»­Ãæ²¢½«Æä·­×ª
+    def play_video(self):
+        # è¯»å–ä¸€å¸§è§†é¢‘
         ret, frame = self.cap.read()
-        frame = cv2.flip(frame, 1)
-        # ½ÃÕıÑÕÉ«
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        height, width, channel = frame.shape
 
-        # ´´½¨ QImage ¶ÔÏó£¬²¢´ÓÉãÏñÍ·»­ÃæÖĞ»ñÈ¡ÏñËØÊı¾İ
-        qimage = QImage(frame, width, height, channel * width, QImage.Format_RGB888)
+        # å¦‚æœæˆåŠŸè¯»å–åˆ°äº†ä¸€å¸§è§†é¢‘
+        if ret:
+            # å°†å›¾åƒæ ¼å¼ä»OpenCVæ ¼å¼è½¬æ¢ä¸ºQImageæ ¼å¼
+            image = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(image)
 
-        # ½« QImage ¶ÔÏó×ª»»Îª QPixmap ¶ÔÏó£¬²¢ÏÔÊ¾ÔÚ QLabel ×é¼şÉÏ
-        pixmap = QPixmap(qimage)
-        self.label.setPixmap(pixmap)
+            # åœ¨æ ‡ç­¾ä¸Šæ˜¾ç¤ºå›¾åƒ
+            self.label.setPixmap(pixmap)
 
-    def toggle_pause(self):
-        self.paused = not self.paused
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    player = VideoPlayer()
+    player.show()
+    sys.exit(app.exec_())
 
-
-app = QApplication(sys.argv)
-win = MainWindow()
-win.show()
-sys.exit(app.exec_())
