@@ -21,7 +21,7 @@
   </property>
   <property name="windowIcon">
    <iconset>
-    <normaloff>../../ui_img/icon.jpg</normaloff>../../ui_img/icon.jpg</iconset>
+    <normaloff>icons8-ai-80.png</normaloff>icons8-ai-80.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="enabled">

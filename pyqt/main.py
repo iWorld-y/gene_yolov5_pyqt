@@ -102,20 +102,16 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         # 如果处于暂停状态，直接返回
         if self.paused_camer:
             return
-        # 读取视频画面并将其翻转
-        logging.info(self.video_path)
+
         _, self.video_stream = self.video_capture.read()
-        self.video_stream = cv2.flip(self.video_stream, 1)
         # 矫正颜色
         self.video_stream = cv2.cvtColor(self.video_stream, cv2.COLOR_BGR2RGB)
         height, width, channel = self.video_stream.shape
-        logging.info("颜色校正")
         # 创建 QImage 对象，将原画面显示出来
         qimage = QImage(self.video_stream, width, height, channel * width, QImage.Format_RGB888)
         pixmap = QtGui.QPixmap(qimage).scaled(self.main_ui.origin_image.width(),
                                               self.main_ui.origin_image.height())
         self.main_ui.origin_image.setPixmap(pixmap)
-        logging.info("显示原图像")
         # 预测画面
         try:
             output_stream, origin_stream = self.inference('', self.video_stream)
@@ -128,7 +124,6 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
                                origin_stream.shape[1] * 3, QImage.Format_RGB888)
         pixmap_stream = QtGui.QPixmap.fromImage(origin_stream).scaled(self.main_ui.show_label.width(),
                                                                       self.main_ui.show_label.height())
-        logging.info("显示预测图像")
         self.main_ui.show_label.setPixmap(pixmap_stream)
 
     def open_camer(self):
@@ -138,6 +133,15 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         self.timer.start(50)
         # 如果处于暂停状态，直接返回
         if self.paused_camer:
+            return
+        try:
+            assert 1==0
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "错误", "摄像头无法打开", buttons=QtWidgets.QMessageBox.Ok,
+                                          defaultButton=QtWidgets.QMessageBox.Ok)
+        if (not self.video_capture.isOpened()):
+            QtWidgets.QMessageBox.warning(self, "错误", "摄像头无法打开", buttons=QtWidgets.QMessageBox.Ok,
+                                          defaultButton=QtWidgets.QMessageBox.Ok)
             return
         # 读取摄像头画面并将其翻转
         _, video_stream = self.video_capture.read()
@@ -178,7 +182,14 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
             return
 
         weight_name = os.path.basename(self.weight_path)
-        self.onnx_session = onnxruntime.InferenceSession(self.weight_path, providers=['CPUExecutionProvider'])
+        try:  # 尝试加载 ONNX 权重，若报错即权重不可用
+            self.onnx_session = onnxruntime.InferenceSession(self.weight_path, providers=['CPUExecutionProvider'])
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "错误", "权重解析失败\n请检查权重是否正确",
+                                          buttons=QtWidgets.QMessageBox.Ok,
+                                          defaultButton=QtWidgets.QMessageBox.Ok)
+            logging.error("权重解析失败，请检查权重是否正确")
+            return
         logging.info(f"已获取 ONNX:\t{weight_name}")
 
         self.model_input_names = self.get_model_input_names()
@@ -187,23 +198,14 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         self.main_ui.open_weight.setText(
             QtCore.QCoreApplication.translate("MainWindow", f"当前权重：\n{weight_name}"))
 
-    def model_init(self):
-        self.model_args = dict(
-            weight_path="runs/v5/exp2/weights/best.pt",
-            device='0',  # 默认为 GPU 0, 可选 cpu
-            img_size=640,
-            augment=640,
-        )
-
-        if (self.weight_path):
-            logging.warning("权重获取失败")
-            return
-        logging.info(self.model_args)
-
     def detect_image(self):
         self.imgName, imgType = QFileDialog.getOpenFileName(self, "打开图片",
                                                             "/home/eugene/code/gene_yolov5_pyqt/pyqt/temp",
                                                             "*.jpg;;*.png;;All Files(*)")
+        if (not self.imgName):
+            QtWidgets.QMessageBox.warning(self, "错误", "未选择图片", buttons=QtWidgets.QMessageBox.Ok,
+                                          defaultButton=QtWidgets.QMessageBox.Ok)
+            return
         jpg = QtGui.QPixmap(self.imgName).scaled(self.main_ui.origin_image.width(), self.main_ui.origin_image.height())
         self.main_ui.origin_image.setPixmap(jpg)
 
@@ -212,7 +214,6 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
         output_img, origin_img = self.inference(self.imgName, np.ndarray([0]))
         outbox_img = self.filter_box(output_img, self.conf, self.iou)
         self.draw(origin_img, outbox_img)
-        cv2.imwrite('/home/eugene/code/gene_yolov5_pyqt/pyqt/temp/res_1.jpg', origin_img)
         logging.info(f"推理完成")
         origin_img = cv2.cvtColor(origin_img, cv2.COLOR_BGR2RGB)
         origin_img = QImage(origin_img[:], origin_img.shape[1], origin_img.shape[0], origin_img.shape[1] * 3,
