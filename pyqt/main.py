@@ -79,7 +79,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
             QtCore.QCoreApplication.translate("MainWindow", "暂停" if self.paused_camer else "继续"))
 
     def load_video(self):
-        self.video_path, _ = QFileDialog.getOpenFileName(self, "打开图片",
+        self.video_path, _ = QFileDialog.getOpenFileName(self, "打开视频",
                                                          "/home/eugene/autodl-tmp/test",
                                                          "All Files(*)")
         if not self.video_path:
@@ -200,7 +200,7 @@ class Gene_Window(QMainWindow, Ui_MainWindow):
 
     def detect_image(self):
         self.imgName, imgType = QFileDialog.getOpenFileName(self, "打开图片",
-                                                            "/home/eugene/code/gene_yolov5_pyqt/pyqt/temp",
+                                                            "/home/eugene/autodl-tmp/test",
                                                             "*.jpg;;*.png;;All Files(*)")
         if (not self.imgName):
             QtWidgets.QMessageBox.warning(self, "错误", "未选择图片", buttons=QtWidgets.QMessageBox.Ok,
